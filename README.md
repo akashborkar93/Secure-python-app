@@ -200,4 +200,35 @@ Newest entries go at the bottom. Each entry: what we did, why, the command, the 
 - See Grafana from your PC: `ssh -i ~/.ssh/demo-key.pem -L 3000:localhost:3000 ubuntu@<ip>` then on the server
   `kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80`, and open http://localhost:3000.
 
+### 2026-11-22: Step 7, Pushed to GitHub and tore down ALL AWS resources
+- Pushed the whole project to https://github.com/akashborkar93/Secure-python-app (commit `c14865d`) after
+  scanning for secrets (none) and redacting the AWS account ID from this README. `.gitignore` blocks keys,
+  `.env`, Terraform state and the Grafana password file.
+- Deleted from AWS (us-east-1), in this order: EC2 instance `i-0f2b0cfadcc7dd530` (its 20 GB disk was deleted with it),
+  security group `demo-workstation-sg`, key pair `demo-key`, IAM instance profile `demo-workstation-profile`
+  and role `demo-workstation-role` (AdministratorAccess).
+- Verified afterwards: no instances, volumes, snapshots, Elastic IPs, load balancers, NAT gateways, EKS clusters or
+  demo IAM roles remain. Local `~/.ssh/demo-key.pem` removed. The k3s cluster, Grafana password file and
+  everything on the server are gone with the instance (everything needed is in this repo).
+- Kept: the AWS Budget `demo-project-5usd` (costs nothing, warns by email). Delete with
+  `aws budgets delete-budget --account-id <ACCOUNT_ID> --budget-name demo-project-5usd`.
+- Not touched (owner's own account items): IAM user `skycloud` and its access key. Recommended: deactivate/delete
+  that access key in IAM and delete `~/.aws/credentials` when finished.
+
+## 7. Project status and how to resume
+
+| Done (tested on EC2 + k3s) | Not done yet |
+|---|---|
+| Python app, tests, hardened Dockerfile | Terraform for VPC, ECR, EKS (Stage B) |
+| Helm chart: HPA, PDB, NetworkPolicy, probes, security context | GitHub Actions CI pipeline |
+| Gateway API with Envoy Gateway, HTTPRoutes | Argo CD / GitOps |
+| Prometheus, Alertmanager, Grafana, dashboard, 4 alerts | Image push to ECR |
+| | TLS (cert-manager), Route53 DNS, ExternalDNS |
+| | Alert emails (Amazon SES) |
+
+To rebuild the test environment: run `scripts/01-create-ec2.ps1`, copy the repo to the server,
+then run `scripts/02-install-tools.sh`, build the image, `helm install` the chart, and run
+`scripts/05-install-envoy-gateway.sh` and `scripts/06-install-monitoring.sh` (about 30 minutes, under $1).
+Next planned steps: Argo CD, GitHub Actions CI, Terraform for EKS (see MASTER-PLAN.md).
+
 <!-- New log entries are appended below this line. -->
