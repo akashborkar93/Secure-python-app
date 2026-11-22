@@ -1,0 +1,30 @@
+{{- if .Values.networkPolicy.enabled }}
+# networkpolicy.yaml - A firewall for the app's pods.
+# Once a policy selects a pod, ALL incoming traffic is blocked except what is listed below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  # Which pods this policy protects: our app's pods.
+  podSelector:
+    matchLabels:
+      {{- include "demo-app.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress          # we only restrict INCOMING traffic
+  ingress:
+    # Allow traffic coming from the listed namespaces, to the app's port only.
+    - from:
+        {{- range .Values.networkPolicy.allowedNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+        # Also allow pods in the SAME namespace (handy for tests).
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+{{- end }}

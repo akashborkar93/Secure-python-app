@@ -1,0 +1,93 @@
+# =============================================================================
+# monitoring-values.yaml - Settings for kube-prometheus-stack (Helm values)
+# =============================================================================
+# kube-prometheus-stack installs a whole monitoring system in one go:
+#   Prometheus       - collects and stores metrics (numbers over time)
+#   Alertmanager     - sends alerts (email, Slack...) when rules fire
+#   Grafana          - draws dashboards from Prometheus data
+#   node-exporter    - metrics about the server (CPU, RAM, disk)
+#   kube-state-metrics - metrics about Kubernetes objects (pods, deployments)
+#   Prometheus Operator - lets us use ServiceMonitor / PrometheusRule objects
+#
+# These values keep everything SMALL so it fits on our 4 GB test server (Stage A).
+# For EKS (Stage B) we will raise replicas, resources and retention, and add disks.
+
+# ---------- Prometheus ----------
+prometheus:
+  prometheusSpec:
+    replicas: 1                 # EKS: 2 for high availability
+    retention: 2d               # keep only 2 days of data (saves memory/disk)
+    # Pick up ServiceMonitors/PrometheusRules from ANY namespace and with ANY labels
+    # (by default it only reads ones created by this Helm release).
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 100m, memory: 400Mi }
+      limits:   { memory: 700Mi }
+
+# ---------- Alertmanager ----------
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1                 # EKS: 3
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+      limits:   { memory: 64Mi }
+  # Where alerts are sent. For now alerts only show up in the Alertmanager/Grafana UI.
+  # Email later: add an "email_configs" receiver (needs SMTP, e.g. Amazon SES in us-east-1).
+  config:
+    route:
+      receiver: "null"          # the "null" receiver = do nothing (placeholder)
+      group_by: ["alertname", "namespace"]
+    receivers:
+      - name: "null"
+
+# ---------- Grafana ----------
+grafana:
+  # The admin password is NOT written here. We create a Secret with a random password
+  # (see scripts/06-install-monitoring.sh) and tell Grafana to read it.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { memory: 384Mi }
+  # Grafana boots slowly on our tiny test server (it took over a minute). With the default
+  # probes Kubernetes thought it was dead and kept restarting it, so we are more patient:
+  # wait 2 minutes before the first check, then allow 10 failed checks before restarting.
+  livenessProbe:
+    initialDelaySeconds: 120
+    periodSeconds: 15
+    failureThreshold: 10
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 12
+  # Any ConfigMap with the label grafana_dashboard=1 is loaded automatically as a dashboard.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+
+# ---------- Smaller helpers ----------
+prometheusOperator:
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+    limits:   { memory: 128Mi }
+kube-state-metrics:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits:   { memory: 64Mi }
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits:   { memory: 32Mi }
+
+# ---------- Turn OFF scraping of parts k3s does not expose ----------
+# k3s runs these control-plane parts inside one process, so Prometheus cannot scrape
+# them separately and would show false "target down" alerts. (EKS hides them too.)
+kubeEtcd:              { enabled: false }
+kubeScheduler:         { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeProxy:             { enabled: false }

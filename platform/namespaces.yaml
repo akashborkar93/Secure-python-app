@@ -1,0 +1,53 @@
+# =============================================================================
+# namespaces.yaml - Creates the two "rooms" (namespaces) inside the one cluster
+# =============================================================================
+# A namespace separates one environment from another inside the same cluster.
+# We apply this file once with:  kubectl apply -f platform/namespaces.yaml
+
+# ---------- DEV namespace ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:
+    # SECURITY: Kubernetes refuses to start any pod in this namespace that breaks
+    # the "restricted" rules (e.g. running as root, privileged containers).
+    pod-security.kubernetes.io/enforce: restricted
+    # Label used later by the Gateway to decide which namespaces may attach routes.
+    gateway-access: "true"
+---
+# ResourceQuota = a spending limit for the namespace, so dev can't eat the whole cluster.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dev-quota
+  namespace: dev
+spec:
+  hard:
+    requests.cpu: "500m"       # total CPU all pods may ask for
+    requests.memory: 512Mi     # total memory all pods may ask for
+    limits.cpu: "1"            # total CPU ceiling
+    limits.memory: 768Mi       # total memory ceiling
+    pods: "10"                 # at most 10 pods
+---
+# ---------- PROD namespace ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    gateway-access: "true"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: prod-quota
+  namespace: prod
+spec:
+  hard:
+    requests.cpu: "800m"
+    requests.memory: 768Mi
+    limits.cpu: "1500m"
+    limits.memory: 1Gi
+    pods: "15"

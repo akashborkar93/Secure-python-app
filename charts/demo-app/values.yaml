@@ -1,0 +1,65 @@
+# =============================================================================
+# values.yaml - DEFAULT settings for the chart
+# =============================================================================
+# Templates in the templates/ folder read these values (e.g. {{ .Values.image.tag }}).
+# Environment files (values-dev.yaml / values-prod.yaml) override only what differs.
+
+# Which environment this is. Shown by the app on "/" and used as a label.
+environment: dev
+
+# ---------- Container image ----------
+image:
+  repository: demo-app        # later: <account>.dkr.ecr.us-east-1.amazonaws.com/demo-app
+  tag: local                  # later: the git commit SHA (never "latest")
+  pullPolicy: IfNotPresent    # only download if the node doesn't already have it
+
+# ---------- Replicas & autoscaling ----------
+# HPA = HorizontalPodAutoscaler: adds pods when CPU is busy, removes them when idle.
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70   # add pods when average CPU passes 70% of the request
+
+# ---------- CPU / memory ----------
+# requests = what the pod is guaranteed (used for scheduling and for the HPA %).
+# limits   = the most it may use.
+resources:
+  requests:
+    cpu: 50m          # 50 millicores = 5% of one CPU core
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# ---------- Service ----------
+service:
+  port: 80            # port other things use to reach the app
+  targetPort: 8000    # port the app listens on inside the container
+
+# ---------- Monitoring (Prometheus) ----------
+# Creates a ServiceMonitor (scrape /metrics) and alert rules. Needs Prometheus Operator installed.
+monitoring:
+  enabled: true
+
+# ---------- HTTPRoute (Gateway API) ----------
+# Sends web traffic for "hostname" from the shared Gateway to this app.
+httpRoute:
+  enabled: true
+  hostname: dev.akashcloud.online       # overridden per environment
+  gatewayName: shared-gateway
+  gatewayNamespace: envoy-gateway-system
+
+# ---------- PodDisruptionBudget ----------
+# Protects availability during maintenance (e.g. node drain): keep at least N pods up.
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# ---------- NetworkPolicy (pod firewall) ----------
+# When enabled, ONLY the namespaces listed below may talk to the app. Everything else is blocked.
+networkPolicy:
+  enabled: true
+  allowedNamespaces:
+    - envoy-gateway-system   # where the Gateway (traffic entry point) will live
+    - monitoring             # where Prometheus will live (it must read /metrics)

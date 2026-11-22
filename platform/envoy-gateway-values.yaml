@@ -1,0 +1,11 @@
+# envoy-gateway-values.yaml - Settings for the Envoy Gateway controller (Helm values).
+# Kept small so it fits on our 4 GB test server.
+deployment:
+  replicas: 1            # Stage B (EKS) will use 2 for high availability
+  envoyGateway:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi

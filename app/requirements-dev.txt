@@ -1,0 +1,5 @@
+# Extra libraries only needed for testing and checking code. NOT put in the Docker image.
+-r requirements.txt         # include the runtime libraries too
+pytest==8.3.3               # runs the tests
+httpx==0.27.2               # lets tests call the app like a browser would
+ruff==0.6.9                 # code style checker (used later in CI)

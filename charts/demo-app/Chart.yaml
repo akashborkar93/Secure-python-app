@@ -1,0 +1,7 @@
+# Chart.yaml - The "label on the box": name and version of this Helm chart.
+apiVersion: v2
+name: demo-app
+description: Helm chart for the Secure Python Demo App
+type: application
+version: 0.1.0        # version of the CHART (change when templates change)
+appVersion: "1.0.0"   # version of the APP inside (informational)

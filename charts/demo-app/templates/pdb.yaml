@@ -1,0 +1,16 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+# pdb.yaml - PodDisruptionBudget: a promise to Kubernetes about maintenance.
+# "During planned work (node drain/upgrade), never take down so many pods that
+# fewer than minAvailable remain."
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "demo-app.selectorLabels" . | nindent 6 }}
+{{- end }}

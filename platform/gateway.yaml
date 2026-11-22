@@ -1,0 +1,41 @@
+# =============================================================================
+# gateway.yaml - The front door for all web traffic into the cluster
+# =============================================================================
+# Two objects:
+#   1. GatewayClass = "which controller handles gateways of this class" (Envoy Gateway).
+#   2. Gateway      = the actual entry point: which ports/protocols it listens on,
+#                     and which namespaces may attach routes to it.
+# Apps then attach an HTTPRoute (in their own namespace) to say "send host X to my Service".
+
+# ---------- 1. GatewayClass ----------
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy
+spec:
+  # This fixed string tells Kubernetes that Envoy Gateway is in charge.
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+---
+# ---------- 2. Gateway ----------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: envoy-gateway-system
+spec:
+  gatewayClassName: envoy
+  listeners:
+    # Plain HTTP on port 80.
+    # (Stage B on EKS will add an HTTPS listener on 443 with a certificate and make
+    #  this one redirect to HTTPS.)
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          # SECURITY: only namespaces labelled gateway-access=true (dev and prod) may
+          # attach routes. Other namespaces cannot hijack the front door.
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: "true"

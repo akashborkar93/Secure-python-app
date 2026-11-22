@@ -1,0 +1,71 @@
+{{- if .Values.monitoring.enabled }}
+# servicemonitor.yaml - Tells Prometheus: "scrape this app's /metrics every 15 seconds".
+# ServiceMonitor is an object added by the Prometheus Operator (installed in Step 6).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  # Find the app's Service by its labels (only in this namespace).
+  selector:
+    matchLabels:
+      {{- include "demo-app.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http            # the named port in service.yaml
+      path: /metrics
+      interval: 15s
+  # Keep the metric label "job" = "demo-app" (the dashboard uses it).
+  jobLabel: app.kubernetes.io/name
+---
+# prometheusrule.yaml - Alert rules. When an "expr" is true for the "for" time, an alert fires.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: demo-app.rules
+      rules:
+        # Alert 1: the app has stopped answering Prometheus scrapes.
+        - alert: DemoAppDown
+          expr: absent(up{namespace="{{ .Release.Namespace }}", job="demo-app"} == 1)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "demo-app is down in {{ .Release.Namespace }}"
+            description: "No healthy demo-app pod has been seen for 2 minutes."
+        # Alert 2: more than 5% of requests are failing with a 5xx error.
+        - alert: DemoAppHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}", status=~"5.."}[5m]))
+              / sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High 5xx error rate in {{ .Release.Namespace }}"
+        # Alert 3: slow responses (95% of requests take longer than 0.5 seconds).
+        - alert: DemoAppHighLatency
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace="{{ .Release.Namespace }}"}[5m]))) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "p95 latency above 0.5s in {{ .Release.Namespace }}"
+        # Alert 4: the autoscaler has reached its maximum, so it cannot add more pods.
+        - alert: DemoAppAtMaxReplicas
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="{{ .Release.Namespace }}", horizontalpodautoscaler="{{ .Release.Name }}"}
+              >= kube_horizontalpodautoscaler_spec_max_replicas{namespace="{{ .Release.Namespace }}", horizontalpodautoscaler="{{ .Release.Name }}"}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "HPA is at max replicas in {{ .Release.Namespace }}"
+{{- end }}

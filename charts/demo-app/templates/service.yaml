@@ -1,0 +1,17 @@
+# service.yaml - A stable internal address for the app.
+# Pods come and go (their IPs change); the Service gives them ONE fixed name and
+# load-balances between whichever pods are ready.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP            # reachable only inside the cluster (the Gateway will expose it)
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+  selector:
+    {{- include "demo-app.selectorLabels" . | nindent 4 }}

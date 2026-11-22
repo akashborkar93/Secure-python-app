@@ -1,0 +1,13 @@
+# values-dev.yaml - Overrides for the DEV environment (small and cheap).
+environment: dev
+
+httpRoute:
+  hostname: dev.akashcloud.online
+
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 2
+
+# With only 1 replica, a PodDisruptionBudget would block node maintenance, so it stays off.
+podDisruptionBudget:
+  enabled: false

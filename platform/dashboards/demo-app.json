@@ -1,0 +1,64 @@
+{
+  "title": "Demo App - Overview",
+  "uid": "demo-app-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "label": "Environment (namespace)",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(http_requests_total, namespace)",
+        "refresh": 2,
+        "includeAll": false,
+        "current": { "text": "prod", "value": "prod" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Request rate (requests/second)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{namespace=\"$namespace\",path!~\"/metrics|/healthz|/readyz\"}[1m]))", "legendFormat": "all requests" }
+      ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Errors (5xx responses/second)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{namespace=\"$namespace\",status=~\"5..\"}[1m]))", "legendFormat": "5xx errors" }
+      ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Latency p95 (seconds)",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[5m])))", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Pods running",
+      "gridPos": { "x": 12, "y": 8, "w": 6, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "count(up{namespace=\"$namespace\",job=\"demo-app\"} == 1)", "legendFormat": "pods" }
+      ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "CPU per pod (cores)",
+      "gridPos": { "x": 18, "y": 8, "w": 6, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",container=\"app\"}[1m]))", "legendFormat": "{{pod}}" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Never commit secrets, keys, or local junk.
+*.pem
+*.key
+.env
+.grafana-admin-password
+credentials
+
+# Terraform (when added in Stage B)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.ruff_cache/
+
+# Misc
+*.tar
+tmp-*.sh

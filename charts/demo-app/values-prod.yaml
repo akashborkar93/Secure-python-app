@@ -1,0 +1,15 @@
+# values-prod.yaml - Overrides for the PROD environment (highly available).
+environment: prod
+
+httpRoute:
+  hostname: app.akashcloud.online
+
+# Always at least 2 pods, so one can fail or restart without downtime.
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4
+
+# Keep at least 1 pod running during voluntary disruptions (node drains, upgrades).
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

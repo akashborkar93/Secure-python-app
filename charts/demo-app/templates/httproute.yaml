@@ -1,0 +1,28 @@
+{{- if .Values.httpRoute.enabled }}
+# httproute.yaml - Routing rule for the Gateway API.
+# Meaning: "Requests for <hostname> that arrive at the shared Gateway go to this app's Service."
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  # Which Gateway to attach to (it lives in another namespace; that is allowed because
+  # the Gateway's allowedRoutes accepts namespaces labelled gateway-access=true).
+  parentRefs:
+    - name: {{ .Values.httpRoute.gatewayName }}
+      namespace: {{ .Values.httpRoute.gatewayNamespace }}
+  # Only match requests for this website name.
+  hostnames:
+    - {{ .Values.httpRoute.hostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # Where to send matching traffic: our Service.
+      backendRefs:
+        - name: {{ .Release.Name }}
+          port: {{ .Values.service.port }}
+{{- end }}

@@ -1,0 +1,112 @@
+# =============================================================================
+# deployment.yaml - Tells Kubernetes HOW to run the app's pods
+# =============================================================================
+# A Deployment keeps the wanted number of identical pods running, replaces failed
+# ones, and rolls out new versions gradually.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+spec:
+  # If the autoscaler (HPA) is on, IT decides the replica count, so we don't set it here.
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  {{- end }}
+
+  # The Deployment manages every pod that has these labels.
+  selector:
+    matchLabels:
+      {{- include "demo-app.selectorLabels" . | nindent 6 }}
+
+  # ZERO-DOWNTIME UPDATES: start 1 new pod first, and never remove an old pod
+  # until the new one is ready.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        {{- include "demo-app.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      automountServiceAccountToken: false
+
+      # SECURITY (pod level): run as a normal user, with the default seccomp filter.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      # HIGH AVAILABILITY: try to place pods on different nodes (and zones on EKS).
+      # "ScheduleAnyway" = a preference, so it still works on our 1-node test cluster.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "demo-app.selectorLabels" . | nindent 14 }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "demo-app.selectorLabels" . | nindent 14 }}
+
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+
+          # Environment variables read by main.py.
+          env:
+            - name: APP_ENV
+              value: {{ .Values.environment | quote }}
+            - name: APP_VERSION
+              value: {{ .Values.image.tag | quote }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          # SECURITY (container level): lock the container down.
+          securityContext:
+            allowPrivilegeEscalation: false   # cannot gain more rights
+            readOnlyRootFilesystem: true      # cannot write to its own filesystem
+            capabilities:
+              drop: ["ALL"]                   # remove all special Linux powers
+
+          # STARTUP probe: gives the app time to boot before the other probes begin.
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            failureThreshold: 20
+            periodSeconds: 2
+          # LIVENESS probe: if this fails, Kubernetes RESTARTS the container.
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          # READINESS probe: if this fails, the pod is REMOVED from traffic (not restarted).
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+
+          # Give the app a writable temporary folder even though the root filesystem is read-only.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+      # Allow in-flight requests 30 seconds to finish when a pod is shut down.
+      terminationGracePeriodSeconds: 30

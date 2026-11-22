@@ -1,0 +1,4 @@
+# Libraries the app needs at runtime. Versions are pinned (==) so every build is identical.
+fastapi==0.115.0            # the web framework
+uvicorn[standard]==0.30.6   # the web server that runs FastAPI
+prometheus-client==0.21.0   # creates the /metrics numbers

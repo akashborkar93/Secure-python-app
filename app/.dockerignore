@@ -1,0 +1,10 @@
+# Files Docker must NOT copy into the build (keeps the image small and free of secrets).
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.git/
+.env
+Dockerfile
+README.md
